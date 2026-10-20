@@ -45,6 +45,7 @@ def admin_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text='📊 Dashboard',callback_data='adm:stats')],
         [InlineKeyboardButton(text='📥 JSON Market',callback_data='adm:json'),InlineKeyboardButton(text='📝 JSON xizmat',callback_data='adm:jsonservice')],
+        [InlineKeyboardButton(text='🧾 JSON so‘rov matni',callback_data='adm:jsonprompt')],
         [InlineKeyboardButton(text='💎 Tariflar',callback_data='adm:plans'),InlineKeyboardButton(text='💳 To‘lov usullari',callback_data='adm:payments')],
         [InlineKeyboardButton(text='💸 Pul chiqarish',callback_data='adm:withdraw'),InlineKeyboardButton(text='💰 Balans to‘ldirish',callback_data='adm:topups')],
         [InlineKeyboardButton(text='👥 Foydalanuvchilar',callback_data='adm:users'),InlineKeyboardButton(text='💰 Balanslar',callback_data='adm:balances')],
@@ -62,7 +63,7 @@ def user_admin(rows):
         status = '🔴' if r['blocked'] else '🟢'
         name = (r['username'] or r['full_name'] or str(r['telegram_user_id']))[:24]
         buttons.append([InlineKeyboardButton(text=f'{status} {name} • {format_money(r["balance"])}', callback_data=f'useradm:{r["telegram_user_id"]}')])
-    buttons.append([InlineKeyboardButton(text='🔎 ID bo‘yicha topish', callback_data='usersearch')])
+    buttons.append([InlineKeyboardButton(text='🔎 ID / @username qidirish', callback_data='usersearch')])
     buttons.append([InlineKeyboardButton(text='🔙 Admin panel', callback_data='adm:home')])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 

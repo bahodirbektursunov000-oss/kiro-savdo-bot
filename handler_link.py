@@ -141,11 +141,12 @@ async def admin_link_panel(c: CallbackQuery, db: Database, config: Config):
  if c.from_user.id not in config.admin_ids: return await c.answer('Ruxsat yo‘q.', show_alert=True)
  enabled=db.setting('kiro_link_enabled','1') == '1'
  rows=db.all_kiro_link_requests(50)
+ counts=db.kiro_link_counts()
  kb=InlineKeyboardMarkup(inline_keyboard=[
   [InlineKeyboardButton(text=('🔴 Link xizmatini o‘chirish' if enabled else '🟢 Link xizmatini yoqish'),callback_data='adm:linktoggle')],
   [InlineKeyboardButton(text='🔄 Yangilash',callback_data='adm:link')]
  ])
- await c.message.answer(f'🔗 <b>LINK BOSHQARUVI</b>\nHolati: <b>{"YOQILGAN" if enabled else "O‘CHIRILGAN"}</b>\n\nOxirgi {len(rows)} ta so‘rov:',parse_mode='HTML',reply_markup=kb)
+ await c.message.answer(f'🔗 <b>LINK BOSHQARUVI</b>\nHolati: <b>{"YOQILGAN" if enabled else "O‘CHIRILGAN"}</b>\n💰 Narx: <b>{format_money(int(db.setting("kiro_link_price","0") or 0))}</b>\n\n📊 Jami: {counts.get("total",0)} | Kutilmoqda: {counts.get("requested",0)+counts.get("link_sent",0)+counts.get("payment_reported",0)}\n🔗 Link yuborilgan: {counts.get("link_sent",0)+counts.get("payment_reported",0)+counts.get("paid",0)}\n✅ Bajarilgan: {counts.get("paid",0)}\n⏳ To‘lov tekshirilmoqda: {counts.get("payment_reported",0)}\n❌ Rad etilgan: {counts.get("rejected",0)}\n🚫 Bekor qilingan: {counts.get("cancelled",0)}\n\nOxirgi {len(rows)} ta so‘rov:',parse_mode='HTML',reply_markup=kb)
  labels={'requested':'So‘rov keldi','link_sent':'Link yuborildi','payment_reported':'To‘lov tekshirilsin','paid':'To‘landi','rejected':'Rad etildi','cancelled':'Bekor qilindi','issue':'Link muammosi'}
  for r in rows:
   user=f'@{r["username"]}' if r['username'] else (r['full_name'] or 'Foydalanuvchi')

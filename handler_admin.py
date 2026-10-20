@@ -111,7 +111,9 @@ async def download(c:CallbackQuery,db:Database,config:Config):
  if not adm(c.from_user.id,config):return await deny(c)
  s=db.submission(int(c.data.split(':')[1]));
  if not s:return await c.answer('Topilmadi.',show_alert=True)
- await c.message.answer_document(BufferedInputFile(s['json_text'].encode(),filename=f'json_{s["id"]}.json'));await c.answer()
+ data = bytes(s['original_bytes']) if s['original_bytes'] is not None else s['json_text'].encode('utf-8')
+ filename = s['original_filename'] or f'json_{s["id"]}.json'
+ await c.message.answer_document(BufferedInputFile(data,filename=filename));await c.answer()
 @router.callback_query(F.data.startswith('delete:'))
 async def delete(c:CallbackQuery,db:Database,config:Config):
  if not adm(c.from_user.id,config):return await deny(c)
@@ -280,8 +282,9 @@ async def paydelete(c:CallbackQuery,db:Database,config:Config):
 @router.callback_query(F.data=='adm:users')
 async def users(c:CallbackQuery,db:Database,config:Config):
  if not adm(c.from_user.id,config):return await deny(c)
- rows=db.all_users(50)
- text='👥 <b>FOYDALANUVCHILAR</b>\n\n🟢 faol • 🔴 bloklangan\n' + (f'Jami ko‘rsatilmoqda: {len(rows)} ta' if rows else 'Hali foydalanuvchi yo‘q.')
+ rows=db.all_users(20)
+ counts=db.user_counts()
+ text=(f'👥 <b>FOYDALANUVCHILAR</b>\n\n🧮 Jami: <b>{counts["total"]}</b>\n🟢 Oxirgi 30 kunda aktiv: <b>{counts["active_30d"]}</b>\n🔴 Bloklangan: <b>{counts["blocked"]}</b>\n\nOxirgi {len(rows)} foydalanuvchi:')
  await c.message.answer(text,parse_mode='HTML',reply_markup=user_admin(rows));await c.answer()
 
 @router.callback_query(F.data.startswith('useradm:'))
@@ -298,18 +301,19 @@ async def useradm(c:CallbackQuery,db:Database,config:Config):
 async def usersearch(c:CallbackQuery,state:FSMContext,config:Config):
  if not adm(c.from_user.id,config):return await deny(c)
  await state.set_state(AdminStates.user_manage_id)
- await c.message.answer('🔎 Foydalanuvchining Telegram ID raqamini yuboring.')
+ await c.message.answer('🔎 Telegram ID, @username yoki foydalanuvchi ismini yuboring.')
  await c.answer()
 
 @router.message(AdminStates.user_manage_id,F.text)
 async def usersearch_id(m:Message,state:FSMContext,db:Database,config:Config):
  if not adm(m.from_user.id,config):return
- try: tg=int(m.text.strip())
- except ValueError:return await m.answer('❌ ID faqat raqam bo‘lishi kerak.')
- r=db.user(tg)
- if not r:return await m.answer('❌ Bunday foydalanuvchi topilmadi.')
+ rows=db.search_users(m.text.strip(),20)
+ if not rows:return await m.answer('❌ Foydalanuvchi topilmadi. ID, @username yoki ismni tekshiring.')
  await state.clear()
- await m.answer(f'👤 {escape(r["full_name"])}\n🆔 <code>{tg}</code>\n💰 Balans: <b>{format_money(r["balance"])}</b>',parse_mode='HTML',reply_markup=user_manage(r))
+ if len(rows)==1:
+  r=rows[0]; tg=r['telegram_user_id']
+  return await m.answer(f'👤 {escape(r["full_name"])}\n🆔 <code>{tg}</code>\n🔗 @{escape(r["username"] or 'yo‘q')}\n💰 Balans: <b>{format_money(r["balance"])}</b>',parse_mode='HTML',reply_markup=user_manage(r))
+ await m.answer('🔎 <b>Qidiruv natijalari</b>',parse_mode='HTML',reply_markup=user_admin(rows))
 
 async def _ask_balance(c:CallbackQuery,state:FSMContext,config:Config,tg:int,mode:str):
  if not adm(c.from_user.id,config):return await deny(c)
@@ -558,6 +562,14 @@ async def set_value(m:Message,state:FSMContext,db:Database,config:Config):
  else:v=m.text[:2000]
  db.set_setting(key,v);await state.clear();await m.answer('✅ Sozlama saqlandi.',reply_markup=admin_menu())
 
+
+@router.callback_query(F.data=='adm:jsonprompt')
+async def jsonprompt(c:CallbackQuery,state:FSMContext,db:Database,config:Config):
+ if not adm(c.from_user.id,config): return await deny(c)
+ current=db.setting('json_service_prompt','Ma’lumotlarni yuboring: nomi va kerakli parametrlar.')
+ await state.set_state(AdminStates.set_value); db.set_setting('admin_pending_setting','json_service_prompt')
+ await c.message.answer('🧾 JSON tayyorlash formasining ko‘rsatmasi. Foydalanuvchi aynan shu matnni ko‘radi. Kerakli maydonlarni o‘zingiz yozing (masalan: loyiha nomi, versiya, kerakli parametrlar). Bot foydalanuvchidan alohida ID yoki boshqa maydonlarni o‘zi to‘qib so‘ramaydi.\n\nYangi ko‘rsatmani yuboring. Bekor qilish: /cancel\n\nHozirgi matn:\n'+current)
+ await c.answer()
 
 # ========================= JSON SERVICE =========================
 @router.callback_query(F.data=='adm:jsonservice')

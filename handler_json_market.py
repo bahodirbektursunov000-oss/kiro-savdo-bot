@@ -48,25 +48,28 @@ async def choose(c: CallbackQuery, state: FSMContext, db: Database):
         '/cancel — bekor qilish.', parse_mode='HTML', reply_markup=cancel_inline())
     await c.answer()
 
-async def save_submission(message: Message, state: FSMContext, db: Database, config: Config, raw_text: str):
+async def save_submission(message: Message, state: FSMContext, db: Database, config: Config, raw_text: str, original_bytes: bytes | None = None, original_filename: str | None = None, content_type: str = 'text'):
+    # Validate without replacing the user's original formatting/bytes.
     try:
-        formatted = validate_json(raw_text)
+        validate_json(raw_text)
     except ValueError as e:
         return await message.answer(f'❌ {e}')
     d = await state.get_data()
-    sid = db.create_submission(message.from_user.id, d['plan'], formatted, d['price'])
+    sid = db.create_submission(message.from_user.id, d['plan'], raw_text, d['price'], original_bytes, original_filename, content_type)
     await state.clear()
     await message.answer(f'✅ JSON qabul qilindi.\n🆔 #{sid}\n⏳ Admin tekshiruvini kuting.', reply_markup=main_menu())
     safe_user = escape(message.from_user.username or 'yo‘q')
     text = (f'📥 <b>YANGI JSON #{sid}</b>\n👤 @{safe_user}\n🆔 {message.from_user.id}\n'
-            f'📦 {escape(d["plan"])}\n💰 {format_money(d["price"])}\n\n{html_code_block(formatted)}')
+            f'📦 {escape(d["plan"])}\n💰 {format_money(d["price"])}\n\n{html_code_block(raw_text)}')
     for aid in config.admin_ids:
         try:
             if len(text) <= 4000:
                 await message.bot.send_message(aid, text, reply_markup=submission_actions(sid), parse_mode='HTML')
             else:
                 await message.bot.send_message(aid, f'📥 JSON #{sid} qabul qilindi. JSON katta, fayl orqali yuklab oling.', reply_markup=submission_actions(sid))
-                await message.bot.send_document(aid, BufferedInputFile(formatted.encode('utf-8'), filename=f'json_{sid}.json'))
+                payload = original_bytes if original_bytes is not None else raw_text.encode('utf-8')
+                filename = original_filename or f'json_{sid}.json'
+                await message.bot.send_document(aid, BufferedInputFile(payload, filename=filename))
         except Exception:
             pass
 
@@ -82,13 +85,14 @@ async def receive_document(m: Message, state: FSMContext, db: Database, config: 
         tg_file = await m.bot.get_file(doc.file_id)
         buf = BytesIO()
         await m.bot.download_file(tg_file.file_path, destination=buf)
-        raw = buf.getvalue().decode('utf-8-sig')
+        original_bytes = buf.getvalue()
+        raw = original_bytes.decode('utf-8-sig')
     except UnicodeDecodeError:
         return await m.answer('❌ JSON fayli UTF-8 formatida bo‘lishi kerak.')
     except Exception:
         return await m.answer('❌ Faylni o‘qib bo‘lmadi. Qaytadan yuboring.')
-    await save_submission(m, state, db, config, raw)
+    await save_submission(m, state, db, config, raw, original_bytes=original_bytes, original_filename=doc.file_name or 'original.json', content_type='document')
 
 @router.message(SellStates.waiting_json, F.text)
 async def receive_text(m: Message, state: FSMContext, db: Database, config: Config):
-    await save_submission(m, state, db, config, m.text)
+    await save_submission(m, state, db, config, m.text, original_bytes=m.text.encode('utf-8'), original_filename=None, content_type='text')

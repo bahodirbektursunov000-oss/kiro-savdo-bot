@@ -15,7 +15,7 @@ class Database:
   with self.conn() as c:
    c.executescript('''
    CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,telegram_user_id INTEGER UNIQUE NOT NULL,username TEXT,full_name TEXT NOT NULL,created_at TEXT NOT NULL,last_seen TEXT NOT NULL,balance INTEGER NOT NULL DEFAULT 0,blocked INTEGER NOT NULL DEFAULT 0,blocked_until TEXT,referred_by_tg INTEGER);
-   CREATE TABLE IF NOT EXISTS json_submissions(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,plan TEXT NOT NULL,json_text TEXT NOT NULL,price INTEGER NOT NULL,status TEXT NOT NULL DEFAULT 'pending',reject_reason TEXT,created_at TEXT NOT NULL,reviewed_at TEXT,FOREIGN KEY(user_id) REFERENCES users(id));
+   CREATE TABLE IF NOT EXISTS json_submissions(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,plan TEXT NOT NULL,json_text TEXT NOT NULL,price INTEGER NOT NULL,status TEXT NOT NULL DEFAULT 'pending',reject_reason TEXT,created_at TEXT NOT NULL,reviewed_at TEXT,original_bytes BLOB,original_filename TEXT,content_type TEXT NOT NULL DEFAULT 'text',FOREIGN KEY(user_id) REFERENCES users(id));
    CREATE TABLE IF NOT EXISTS withdrawals(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,amount INTEGER NOT NULL,payment_method TEXT NOT NULL,recipient TEXT NOT NULL,note TEXT,status TEXT NOT NULL DEFAULT 'pending',requested_at TEXT NOT NULL,paid_at TEXT,payment_id TEXT,reject_reason TEXT,paid_by_id INTEGER,paid_by_username TEXT,FOREIGN KEY(user_id) REFERENCES users(id));
    CREATE TABLE IF NOT EXISTS payment_methods(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT UNIQUE NOT NULL,details TEXT NOT NULL DEFAULT '',note TEXT NOT NULL DEFAULT '',enabled INTEGER NOT NULL DEFAULT 1,created_at TEXT NOT NULL);
    CREATE TABLE IF NOT EXISTS plans(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT UNIQUE NOT NULL,price INTEGER NOT NULL,enabled INTEGER NOT NULL DEFAULT 1,created_at TEXT NOT NULL,updated_at TEXT NOT NULL);
@@ -31,6 +31,10 @@ class Database:
    CREATE TABLE IF NOT EXISTS kiro_link_requests(id INTEGER PRIMARY KEY AUTOINCREMENT,user_tg INTEGER NOT NULL,status TEXT NOT NULL DEFAULT 'requested',payment_url TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL);
    ''')
    # migrations for older DBs
+   # Preserve the exact original payload for future downloads. Existing rows remain valid.
+   for col,typ in [('original_bytes','BLOB'),('original_filename','TEXT'),('content_type',"TEXT NOT NULL DEFAULT 'text'")]:
+    try:c.execute(f'ALTER TABLE json_submissions ADD COLUMN {col} {typ}')
+    except sqlite3.OperationalError:pass
    for col,typ,default in [('blocked','INTEGER NOT NULL DEFAULT 0','0'),('blocked_until','TEXT',None),('referred_by_tg','INTEGER',None)]:
     try:c.execute(f'ALTER TABLE users ADD COLUMN {col} {typ}')
     except sqlite3.OperationalError:pass
@@ -45,7 +49,7 @@ class Database:
     except sqlite3.OperationalError:pass
    try:c.execute("ALTER TABLE json_service_orders ADD COLUMN source TEXT NOT NULL DEFAULT 'Ko‘rsatilmagan'")
    except sqlite3.OperationalError:pass
-   defaults={'min_withdrawal':'10000','help_text':'Yordam uchun admin bilan bog‘laning.','admin_username':'','membership_required':'0','official_channel_id':'','official_channel_link':'','payment_channel_id':'','json_service_price':'20000','ref_reward_json_sale':'1000','ref_reward_json_service':'1000','ref_reward_kiro_link':'1000','kiro_link_price':'0','kiro_link_enabled':'1'}
+   defaults={'min_withdrawal':'10000','help_text':'Yordam uchun admin bilan bog‘laning.','admin_username':'','membership_required':'0','official_channel_id':'','official_channel_link':'','payment_channel_id':'','json_service_price':'20000','ref_reward_json_sale':'1000','ref_reward_json_service':'1000','ref_reward_kiro_link':'1000','kiro_link_price':'0','kiro_link_enabled':'1','json_service_prompt':'Ma’lumotlarni yuboring: nomi, kerakli parametrlar va JSON qanday ishlatilishini yozing.'}
    for k,v in defaults.items(): c.execute('INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)',(k,v))
    # Migrate the old single-channel mandatory subscription setting into the new multi-chat table.
    old_chat=c.execute("SELECT value FROM settings WHERE key='official_channel_id'").fetchone()
@@ -189,9 +193,13 @@ class Database:
   with self.conn() as c:
    r=c.execute('DELETE FROM saved_cards WHERE id IN (SELECT sc.id FROM saved_cards sc JOIN users u ON u.id=sc.user_id WHERE sc.id=? AND u.telegram_user_id=?)',(cid,tg))
    return r.rowcount>0
- def create_submission(self,tg,plan,text,price):
+ def create_submission(self,tg,plan,text,price,original_bytes=None,original_filename=None,content_type='text'):
   with self.conn() as c:
-   u=c.execute('SELECT id FROM users WHERE telegram_user_id=?',(tg,)).fetchone();cur=c.execute('INSERT INTO json_submissions(user_id,plan,json_text,price,created_at) VALUES(?,?,?,?,?)',(u['id'],plan,text,price,now()));return cur.lastrowid
+   u=c.execute('SELECT id FROM users WHERE telegram_user_id=?',(tg,)).fetchone()
+   if not u:return None
+   if original_bytes is None:original_bytes=text.encode('utf-8')
+   cur=c.execute('INSERT INTO json_submissions(user_id,plan,json_text,price,created_at,original_bytes,original_filename,content_type) VALUES(?,?,?,?,?,?,?,?)',(u['id'],plan,text,price,now(),sqlite3.Binary(original_bytes),original_filename,content_type))
+   return cur.lastrowid
  def submission(self,sid):
   with self.conn() as c:return c.execute('SELECT s.*,u.telegram_user_id,u.username,u.full_name FROM json_submissions s JOIN users u ON u.id=s.user_id WHERE s.id=?',(sid,)).fetchone()
  def review_submission(self,sid,status,reason=None):
@@ -337,8 +345,25 @@ class Database:
    if cur.rowcount!=1:return None
   return self.subscription(sid)
 
- def all_users(self,limit=50,offset=0):
+ def all_users(self,limit=20,offset=0):
   with self.conn() as c:return c.execute('SELECT * FROM users ORDER BY id DESC LIMIT ? OFFSET ?',(limit,offset)).fetchall()
+ def search_users(self, query, limit=20):
+  q=str(query).strip().lstrip('@')
+  with self.conn() as c:
+   if q.isdigit(): return c.execute('SELECT * FROM users WHERE telegram_user_id=? LIMIT ?', (int(q),limit)).fetchall()
+   return c.execute("SELECT * FROM users WHERE username LIKE ? OR full_name LIKE ? ORDER BY last_seen DESC LIMIT ?", (f'%{q}%',f'%{q}%',limit)).fetchall()
+ def user_counts(self):
+  with self.conn() as c:
+   total=c.execute('SELECT COUNT(*) FROM users').fetchone()[0]
+   active=c.execute("SELECT COUNT(*) FROM users WHERE last_seen >= ?", ((datetime.now(timezone.utc)-__import__('datetime').timedelta(days=30)).isoformat(timespec='seconds'),)).fetchone()[0]
+   blocked=c.execute('SELECT COUNT(*) FROM users WHERE blocked=1').fetchone()[0]
+   return {'total':total,'active_30d':active,'blocked':blocked}
+ def kiro_link_counts(self):
+  with self.conn() as c:
+   rows=c.execute('SELECT status,COUNT(*) n FROM kiro_link_requests GROUP BY status').fetchall()
+   out={r['status']:r['n'] for r in rows}
+   out['total']=sum(out.values())
+   return out
  def set_block(self,tg,blocked,until=None):
   with self.conn() as c:
    cur=c.execute('UPDATE users SET blocked=?,blocked_until=? WHERE telegram_user_id=?',(int(blocked),until,tg))

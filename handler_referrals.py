@@ -33,6 +33,10 @@ async def referral_home(m: Message, db: Database):
         f'👥 Taklif qilganlar: <b>{st["invited"]}</b>\n'
         f'🎁 Mukofot berilgan operatsiyalar: <b>{st["rewards"]}</b>\n'
         f'💰 Jami topilgan: <b>{format_money(st["earned"])}</b>\n\n'
+        f'<b>Amaldagi mukofotlar:</b>\n'
+        f'🛒 JSON sotish: {format_money(int(db.setting("ref_reward_json_sale","0") or 0))}\n'
+        f'📝 JSON tayyorlash: {format_money(int(db.setting("ref_reward_json_service","0") or 0))}\n'
+        f'🔗 Kiro Link: {format_money(int(db.setting("ref_reward_kiro_link","0") or 0))}\n\n'
         f'🔗 <a href="{link}">Shaxsiy referal havolangiz</a>\n<code>{link}</code>', parse_mode='HTML')
 
 @router.callback_query(F.data == 'adm:referrals')

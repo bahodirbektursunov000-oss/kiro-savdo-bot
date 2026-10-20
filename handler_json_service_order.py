@@ -34,8 +34,8 @@ async def choose_source(c: CallbackQuery, state: FSMContext):
     await c.answer('✅ Tanlandi')
     await c.message.answer(
         f'✅ Manba: <b>{escape(source)}</b>\n\n'
-        '📋 Endi JSONga aylantirilishi kerak bo‘lgan <b>ma’lumotlarni oddiy TEXT</b> qilib yuboring.\n'
-        'Masalan: nomi, ID, link, parametrlar va kerakli boshqa ma’lumotlar.\n\n'
+        '📋 Admin belgilagan ma’lumotlarni yuboring:\n'
+        f'<i>{__import__("html").escape(db.setting("json_service_prompt", "Ma’lumotlarni yuboring: nomi va kerakli parametrlar."))}</i>\n\n'
         '/cancel — bekor qilish.',
         parse_mode='HTML', reply_markup=cancel_inline())
 
