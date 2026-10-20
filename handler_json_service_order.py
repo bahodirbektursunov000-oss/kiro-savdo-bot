@@ -23,7 +23,7 @@ async def start(m: Message, state: FSMContext, db: Database):
         parse_mode='HTML', reply_markup=json_source_menu())
 
 @router.callback_query(F.data.startswith('jssource:'))
-async def choose_source(c: CallbackQuery, state: FSMContext):
+async def choose_source(c: CallbackQuery, state: FSMContext, db: Database):
     raw = c.data.split(':', 1)[1].strip().lower()
     source_map = {'github': 'GitHub', 'google': 'Google', 'builder_id': 'Builder ID'}
     source = source_map.get(raw)

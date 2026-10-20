@@ -1,13 +1,12 @@
-# Kiro Savdo Bot — Exact JSON & Admin Prompt Fix
+# Kiro Savdo Bot — callback fix
 
-## Ushbu yangilanish
-- JSON sotish bo‘limida JSON sintaksisi tekshiriladi, lekin foydalanuvchining asl matni qayta formatlanmaydi.
-- `.json` hujjat uchun asl baytlar SQLite bazasida BLOB sifatida saqlanadi; fayl nomi ham saqlanadi.
-- Admin paneldagi JSON yuklab olish asl baytlar va asl fayl nomidan foydalanadi. Eski bazadagi yozuvlar uchun orqaga mos fallback mavjud.
-- Admin foydalanuvchidan so‘raladigan ma’lumot ko‘rsatmasini `JSON so‘rov matni` bo‘limida o‘zi belgilashi mumkin. Bu ko‘rsatma JSON tayyorlash oqimida foydalanuvchiga ko‘rsatiladi.
-- Eski `jsonmarket.db` faylini o‘chirmang: yangi ustunlar avtomatik migratsiya qilinadi.
+## Fix in this update
+- Fixed the JSON preparation source-selection callback (`GitHub`, `Google`, `Builder ID`). It now receives the `Database` dependency required to read the admin-defined prompt. Previously, clicking a source could raise a missing-argument error, leaving the flow stuck.
 
-## Muhim
-- Matn ko‘rinishida yuborilgan JSON Telegram xabari sifatida saqlanadi; fayl sifatida yuborilgan JSON esa asl fayl baytlari bilan saqlanadi.
-- Python sintaksisi va ZIP arxivi tekshirildi. To‘liq Telegram integratsion testi bajarilmagan.
-- `.env` faylingizni ommaga yuklamang. Hostingda maxfiy qiymatlarni environment variables orqali kiriting.
+## Before deploying
+1. Back up the existing SQLite database and environment variables.
+2. Replace the application code with the files in this archive (the archive is flat; no parent folder).
+3. Keep your existing database and hosting environment variables; do not upload `.env` to GitHub.
+4. Restart the bot and test `/start` → `📝 JSON tayyorlash` → `🐙 GitHub`.
+
+Checks performed: Python syntax compilation and ZIP integrity. A live Telegram integration test was not possible here. This update fixes the identified callback bug but does not claim every unrelated bot feature is fully tested.
