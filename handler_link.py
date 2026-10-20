@@ -155,28 +155,99 @@ async def reject_link(c:CallbackQuery,db:Database,config:Config):
 
 @router.callback_query(F.data == 'adm:link')
 async def admin_link_panel(c: CallbackQuery, db: Database, config: Config):
- if c.from_user.id not in config.admin_ids: return await c.answer('Ruxsat yo‘q.', show_alert=True)
- enabled=db.setting('kiro_link_enabled','1') == '1'
- rows=db.all_kiro_link_requests(50)
- counts=db.kiro_link_counts()
- kb=InlineKeyboardMarkup(inline_keyboard=[
-  [InlineKeyboardButton(text=('🔴 Link xizmatini o‘chirish' if enabled else '🟢 Link xizmatini yoqish'),callback_data='adm:linktoggle')],
-  [InlineKeyboardButton(text='🔄 Yangilash',callback_data='adm:link')]
+ if c.from_user.id not in config.admin_ids:
+  return await c.answer('Ruxsat yo‘q.', show_alert=True)
+ enabled = db.setting('kiro_link_enabled', '1') == '1'
+ counts = db.kiro_link_counts()
+ price = int(db.setting('kiro_link_price', '0') or 0)
+ kb = InlineKeyboardMarkup(inline_keyboard=[
+  [InlineKeyboardButton(text=('🔴 O‘chirish' if enabled else '🟢 Yoqish'), callback_data='adm:linktoggle')],
+  [InlineKeyboardButton(text='💰 Link narxi', callback_data='adm:linkprice')],
+  [InlineKeyboardButton(text='✅ Tasdiqlangan linklar', callback_data='adm:linkconfirmed')],
+  [InlineKeyboardButton(text='👥 Berilgan linklar / foydalanuvchilar', callback_data='adm:linkusers')],
+  [InlineKeyboardButton(text='🔄 Yangilash', callback_data='adm:link')]
  ])
- await c.message.answer(f'🔗 <b>LINK BOSHQARUVI</b>\nHolati: <b>{"YOQILGAN" if enabled else "O‘CHIRILGAN"}</b>\n💰 Narx: <b>{format_money(int(db.setting("kiro_link_price","0") or 0))}</b>\n\n📊 Jami: {counts.get("total",0)} | Kutilmoqda: {counts.get("requested",0)+counts.get("link_sent",0)+counts.get("payment_reported",0)}\n🔗 Link yuborilgan: {counts.get("link_sent",0)+counts.get("payment_reported",0)+counts.get("paid",0)}\n✅ Bajarilgan: {counts.get("paid",0)}\n⏳ To‘lov tekshirilmoqda: {counts.get("payment_reported",0)}\n❌ Rad etilgan: {counts.get("rejected",0)}\n🚫 Bekor qilingan: {counts.get("cancelled",0)}\n\nOxirgi {len(rows)} ta so‘rov:',parse_mode='HTML',reply_markup=kb)
- labels={'requested':'So‘rov keldi','link_sent':'Link yuborildi','payment_reported':'To‘lov tekshirilsin','paid':'To‘landi','rejected':'Rad etildi','cancelled':'Bekor qilindi','issue':'Link muammosi'}
+ pending = counts.get('requested', 0) + counts.get('link_sent', 0) + counts.get('payment_reported', 0)
+ text = (f'🔗 <b>LINK BOSHQARUVI</b>\n\n'
+         f'Holati: <b>{"YOQILGAN" if enabled else "O‘CHIRILGAN"}</b>\n'
+         f'💰 Joriy narx: <b>{format_money(price)}</b>\n\n'
+         f'📊 Jami so‘rov: <b>{counts.get("total", 0)}</b>\n'
+         f'🔗 Link yuborilgan: <b>{counts.get("link_sent", 0) + counts.get("payment_reported", 0) + counts.get("paid", 0)}</b>\n'
+         f'✅ Tasdiqlangan: <b>{counts.get("paid", 0)}</b>\n'
+         f'⏳ Kutilayotgan: <b>{pending}</b>\n'
+         f'❌ Rad etilgan: <b>{counts.get("rejected", 0)}</b>\n'
+         f'🚫 Bekor qilingan: <b>{counts.get("cancelled", 0)}</b>\n\n'
+         'Kerakli bo‘limni tanlang:')
+ await c.message.answer(text, parse_mode='HTML', reply_markup=kb)
+ await c.answer()
+
+@router.callback_query(F.data == 'adm:linkprice')
+async def admin_link_price(c: CallbackQuery, state: FSMContext, db: Database, config: Config):
+ if c.from_user.id not in config.admin_ids:
+  return await c.answer('Ruxsat yo‘q.', show_alert=True)
+ db.set_setting('admin_pending_setting', 'kiro_link_price')
+ await state.set_state(AdminStates.set_value)
+ current = int(db.setting('kiro_link_price', '0') or 0)
+ await c.message.answer(f'💰 Hozirgi Kiro Link narxi: {format_money(current)} so‘m\nYangi narxni faqat son bilan yuboring. Bekor qilish: /cancel')
+ await c.answer()
+
+@router.callback_query(F.data == 'adm:linkconfirmed')
+async def admin_link_confirmed(c: CallbackQuery, db: Database, config: Config):
+ if c.from_user.id not in config.admin_ids:
+  return await c.answer('Ruxsat yo‘q.', show_alert=True)
+ with db.conn() as conn:
+  rows = conn.execute("SELECT k.*, u.username, u.full_name FROM kiro_link_requests k LEFT JOIN users u ON u.telegram_user_id=k.user_tg WHERE k.status='paid' ORDER BY k.id DESC LIMIT 50").fetchall()
+ await c.message.answer(f'✅ <b>TASDIQLANGAN LINKLAR</b> — jami ko‘rsatilgan: {len(rows)}', parse_mode='HTML')
+ if not rows:
+  await c.message.answer('Hozircha tasdiqlangan linklar yo‘q.')
+ else:
+  for r in rows:
+   uname = '@' + r['username'] if r['username'] else (r['full_name'] or 'Foydalanuvchi')
+   url = escape(r['payment_url'] or 'Link saqlanmagan')
+   await c.message.answer(f'✅ So‘rov #{r["id"]}\n👤 {escape(uname)}\n🆔 <code>{r["user_tg"]}</code>\n🔗 {url}\n📅 {escape(r["updated_at"] or r["created_at"])}', parse_mode='HTML')
+ await c.answer()
+
+@router.callback_query(F.data == 'adm:linkusers')
+async def admin_link_users(c: CallbackQuery, db: Database, config: Config):
+ if c.from_user.id not in config.admin_ids:
+  return await c.answer('Ruxsat yo‘q.', show_alert=True)
+ with db.conn() as conn:
+  rows = conn.execute("SELECT k.user_tg, COUNT(*) AS link_count, MAX(k.updated_at) AS last_at, u.username, u.full_name FROM kiro_link_requests k LEFT JOIN users u ON u.telegram_user_id=k.user_tg WHERE k.payment_url IS NOT NULL AND k.payment_url!='' GROUP BY k.user_tg ORDER BY last_at DESC LIMIT 50").fetchall()
+ if not rows:
+  await c.message.answer('📭 Hali hech bir foydalanuvchiga link berilmagan.')
+ else:
+  await c.message.answer(f'👥 <b>LINK OLGAN FOYDALANUVCHILAR</b> — {len(rows)} ta', parse_mode='HTML')
+  for r in rows:
+   uname = '@' + r['username'] if r['username'] else (r['full_name'] or 'Foydalanuvchi')
+   kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='🔎 Linklarini ko‘rish', callback_data=f'adm:linkuser:{r["user_tg"]}')]])
+   await c.message.answer(f'👤 {escape(uname)}\n🆔 <code>{r["user_tg"]}</code>\n🔗 Berilgan linklar: <b>{r["link_count"]}</b>', parse_mode='HTML', reply_markup=kb)
+ await c.answer()
+
+@router.callback_query(F.data.startswith('adm:linkuser:'))
+async def admin_link_user_detail(c: CallbackQuery, db: Database, config: Config):
+ if c.from_user.id not in config.admin_ids:
+  return await c.answer('Ruxsat yo‘q.', show_alert=True)
+ try:
+  user_tg = int(c.data.rsplit(':', 1)[1])
+ except ValueError:
+  return await c.answer('Foydalanuvchi ID noto‘g‘ri.', show_alert=True)
+ with db.conn() as conn:
+  rows = conn.execute("SELECT * FROM kiro_link_requests WHERE user_tg=? AND payment_url IS NOT NULL AND payment_url!='' ORDER BY id DESC LIMIT 50", (user_tg,)).fetchall()
+  user = conn.execute('SELECT username, full_name FROM users WHERE telegram_user_id=?', (user_tg,)).fetchone()
+ if not rows:
+  return await c.answer('Bu foydalanuvchida yuborilgan link topilmadi.', show_alert=True)
+ name = ('@' + user['username']) if user and user['username'] else (user['full_name'] if user else 'Foydalanuvchi')
+ await c.message.answer(f'👤 <b>{escape(name)}</b>\n🆔 <code>{user_tg}</code>\n🔗 Jami berilgan link: <b>{len(rows)}</b>', parse_mode='HTML')
+ labels = {'requested':'So‘rov keldi','link_sent':'Link yuborildi','payment_reported':'To‘lov tekshirilmoqda','paid':'Tasdiqlangan','rejected':'Rad etilgan','cancelled':'Bekor qilingan','issue':'Muammo bildirildi'}
  for r in rows:
-  user=f'@{r["username"]}' if r['username'] else (r['full_name'] or 'Foydalanuvchi')
-  url=r['payment_url'] or 'Link berilmagan'
-  msg=f'🔗 <b>So‘rov #{r["id"]}</b>\n👤 {escape(user)}\n🆔 <code>{r["user_tg"]}</code>\n📌 {labels.get(r["status"],r["status"])}\n🌐 {escape(url)}'
-  await c.message.answer(msg,parse_mode='HTML',reply_markup=admin_link_actions(r['id'], r['status']))
- if not rows: await c.message.answer('Hozircha link so‘rovlari yo‘q.')
+  await c.message.answer(f'🔗 <b>So‘rov #{r["id"]}</b>\nHolati: {labels.get(r["status"], r["status"])}\nURL: {escape(r["payment_url"] or "-")}\nSana: {escape(r["created_at"])}', parse_mode='HTML', reply_markup=admin_link_actions(r['id'], r['status']))
  await c.answer()
 
 @router.callback_query(F.data == 'adm:linktoggle')
 async def admin_link_toggle(c: CallbackQuery, db: Database, config: Config):
- if c.from_user.id not in config.admin_ids: return await c.answer('Ruxsat yo‘q.',show_alert=True)
- enabled=db.setting('kiro_link_enabled','1') == '1'
- db.set_setting('kiro_link_enabled','0' if enabled else '1')
- await c.answer('Link xizmati ' + ('o‘chirildi.' if enabled else 'yoqildi.'),show_alert=True)
- await admin_link_panel(c,db,config)
+ if c.from_user.id not in config.admin_ids:
+  return await c.answer('Ruxsat yo‘q.', show_alert=True)
+ enabled = db.setting('kiro_link_enabled', '1') == '1'
+ db.set_setting('kiro_link_enabled', '0' if enabled else '1')
+ await c.answer('Link xizmati ' + ('o‘chirildi.' if enabled else 'yoqildi.'), show_alert=True)
+ await admin_link_panel(c, db, config)
