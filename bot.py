@@ -42,12 +42,6 @@ async def main():
             fsm = data.get('state')
             if fsm is not None:
                 await fsm.clear()
-        if isinstance(event, Message) and event.text in ('📝 JSON tayyorlash', '🛒 JSON sotish', '💰 Balansim', '➕ Balans to‘ldirish', '💸 Pul chiqarish', '📦 Sotuvlarim', '📜 Tarix', '👤 Kabinet', '💳 Kartalarim', '🎁 Referal', '🔗 Link', '❓ Yordam'):
-            from aiogram.fsm.context import FSMContext
-            from aiogram.fsm.storage.base import StorageKey
-            key = StorageKey(bot_id=bot.id, chat_id=event.chat.id, user_id=event.from_user.id)
-            await dp.storage.set_state(key, None)
-            await dp.storage.set_data(key, {})
         if getattr(event, 'from_user', None):
             uid = event.from_user.id
             # SQLite is synchronous; do not write last_seen on every callback.

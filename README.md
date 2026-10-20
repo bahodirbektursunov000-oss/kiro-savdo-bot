@@ -1,64 +1,38 @@
-# Kiro Savdo Bot — Final Test
+# Kiro Savdo Bot — asosiy menyu va Referral/Link
 
-Telegram bot built with Python + aiogram 3.x + SQLite.
+## Asosiy menyu
+Barcha 12 ta bo‘lim bitta asosiy menyuda joylashgan:
+- 🛒 JSON sotish
+- 📝 JSON tayyorlash
+- 🔗 Link
+- 💰 Balansim
+- ➕ Balans to‘ldirish
+- 💸 Pul chiqarish
+- 📦 Sotuvlarim
+- 📜 Tarix
+- 👤 Kabinet
+- 💳 Kartalarim
+- 🎁 Referal
+- ❓ Yordam
 
-## Main features
-- JSON Marketplace with Power / Pro / Pro Max and admin-managed plans
-- JSON input as text or `.json` document
-- Strong JSON validation: duplicate keys, NaN/Infinity, depth and size checks
-- Admin-managed payment methods (Click, Payme, Paynet, Uzum or custom)
-- Withdrawal flow with Processing / Paid / Rejected states
-- User saved cards: add, view, delete; no CVV/PIN/SMS codes are stored
-- Transaction history
-- Mandatory official-channel subscription switch
-- SQLite migrations and backup
-- Double-approval protection and status transition checks
+`➡️ Qo‘shimcha` sahifasi olib tashlandi. Referal va Link bevosita asosiy menyudan ochiladi.
 
-## Setup
-1. Copy `.env.example` to `.env`.
-2. Fill `BOT_TOKEN` and `ADMIN_IDS`.
-3. Install:
-   `python -m pip install -r requirements.txt`
-4. Run:
-   `python bot.py`
+## Ishga tushirish
+1. `.env.example` faylidan nusxa olib `.env` deb nomlang.
+2. `.env` ichida `BOT_TOKEN` va `ADMIN_IDS` qiymatlarini to‘ldiring.
+3. `pip install -r requirements.txt`
+4. `python bot.py`
 
-## Important
-The bot does not implement automatic Click/Payme/Uzum gateway APIs. Payment methods are manually configured in the admin panel and payment proofs are reviewed by admins.
+Hostingda `BOT_TOKEN` va `ADMIN_IDS` ni hosting Variables/Environment Variables bo‘limida kiriting. `.env` faylini GitHub’ga yuklamang.
 
-For mandatory subscription, configure the official channel ID/link and make the bot an administrator of the channel so `get_chat_member` can verify membership.
+## Referal qoidasi
+Taklif qilingan foydalanuvchi botga kirgani uchun mukofot berilmaydi. JSON sotish, JSON tayyorlash yoki Kiro Link operatsiyasi admin tomonidan bajarilgani tasdiqlangandan keyingina tegishli mukofot beriladi. Bekor qilingan/tasdiqlanmagan operatsiyaga mukofot berilmasligi kerak.
 
+## Muhim
+- Deploydan oldin amaldagi SQLite bazangizning zaxira nusxasini oling va uni o‘chirib yubormang.
+- SQLite fayli hostingda doimiy disk/volume’da saqlanishi kerak, aks holda qayta deployda ma’lumot yo‘qolishi mumkin.
+- Kiro Link to‘lovi admin tomonidan alohida tekshiriladi; foydalanuvchining “To‘ladim” tugmasi to‘lov isboti emas.
+- Click/Humo avtomatik tasdiqlash merchant/API integratsiyasini talab qiladi va bu arxivda avtomatik ulangan deb hisoblanmaydi.
 
-## Railway / Production
-- GitHub'ga `.env` va `.venv` yuklanmaydi.
-- Railway Variables: `BOT_TOKEN` va `ADMIN_IDS`.
-- SQLite (`jsonmarket.db`) uchun Railway persistent volume ishlatish tavsiya qilinadi.
-- Bot long polling ishlatadi; public domain/webhook shart emas.
-
-## Admin
-`/admin`:
-- 📣 Hammaga xabar — barcha ro‘yxatdan o‘tgan foydalanuvchilarga matn/rasm/video/hujjat yuboradi.
-- 🔐 Majburiy obuna — bir nechta kanal yoki guruhni qo‘shish, yoqish/o‘chirish va o‘chirish.
-- Majburiy obuna uchun bot tegishli kanal/guruhda administrator bo‘lishi kerak.
-- Payment channel postida foydalanuvchining username/IDsi emas, ismning dastlabki 3 harfi va `*` maskasi ko‘rsatiladi.
-
-## Security
-- BOT_TOKEN GitHub'ga joylanmaydi.
-- Karta CVV/PIN/SMS kodlari saqlanmaydi.
-
-
-## Added in MAX FINAL
-- JSON tayyorlash xizmati + atomic balance deduction + admin delivery/refund
-- Balance top-up flow with admin-managed destination cards
-- Admin top-up approval/rejection
-- Admin broadcast
-- Multi-channel/group mandatory subscription
-- Payment-channel masked user names
-- Interface guide: `../INTERFACE_GUIDE.md`
-
-
-## Kiro Link va referal
-- Foydalanuvchi `🎁 Referal` bo‘limidan shaxsiy `start=ref_<telegram_id>` havolasini oladi.
-- Mukofotlar admin panelidagi `🎁 Referal mukofotlari` bo‘limidan boshqariladi.
-- Mukofot faqat admin tasdiqlagan JSON sotuv, JSON xizmati yoki Kiro Link to‘lovidan keyin beriladi.
-- `🔗 Link` bo‘limida foydalanuvchi link so‘raydi; admin to‘lov URL manzilini qo‘lda yuboradi va real to‘lovni tekshirgandan keyin tasdiqlaydi.
-- Kiro Link to‘lovlari avtomatik tekshirilmaydi: provayder API/webhook ulanmaguncha admin to‘lovni tashqi panelda tekshirishi shart.
+## Tekshiruv
+Python fayllari `py_compile` orqali sintaksis tekshiruvidan o‘tkazilgan. To‘liq bot integratsion sinovi bajarilmadi, chunki tekshiruv muhitida `aiogram` o‘rnatilmagan.

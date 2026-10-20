@@ -29,7 +29,8 @@ async def referral_home(m: Message, db: Database):
     link = f'https://t.me/{me.username}?start=ref_{m.from_user.id}'
     await m.answer(
         '🎁 <b>KIRO REFERAL DASTURI</b>\n\n'
-        'Do‘stlaringizni shaxsiy havolangiz orqali taklif qiling. Faqat do‘stingiz haqiqiy operatsiyani bajargan va admin savdo/xizmatni tasdiqlaganidan keyin mukofot olasiz. Botga qo‘shilishning o‘zi mukofot bermaydi.\n\n'
+        'Do‘stlaringizni shaxsiy havolangiz orqali taklif qiling. 🎁\n\n'
+        '⚠️ <b>Mukofot qoidasi:</b> do‘stingiz botga qo‘shilgani uchungina mukofot berilmaydi. Mukofot faqat haqiqiy JSON savdosi, JSON tayyorlash xizmati yoki Kiro Link to‘lovi admin tomonidan tekshirilib, bajarilgani tasdiqlangandan keyin balansingizga qo‘shiladi. Bekor qilingan yoki tasdiqlanmagan operatsiyaga mukofot yo‘q.\n\n'
         f'👥 Taklif qilganlar: <b>{st["invited"]}</b>\n'
         f'🎁 Mukofot berilgan operatsiyalar: <b>{st["rewards"]}</b>\n'
         f'💰 Jami topilgan: <b>{format_money(st["earned"])}</b>\n\n'

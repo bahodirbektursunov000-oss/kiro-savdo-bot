@@ -1,19 +1,18 @@
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from payment_service import format_money
 
-MENU = ['🛒 JSON sotish','📝 JSON tayyorlash','💰 Balansim','➕ Balans to‘ldirish','💸 Pul chiqarish','📦 Sotuvlarim','📜 Tarix','👤 Kabinet','💳 Kartalarim','🎁 Referal','🔗 Link','❓ Yordam']
+MENU = ['🛒 JSON sotish','📝 JSON tayyorlash','🔗 Link','💰 Balansim','➕ Balans to‘ldirish','💸 Pul chiqarish','📦 Sotuvlarim','📜 Tarix','👤 Kabinet','💳 Kartalarim','🎁 Referal','❓ Yordam']
 
 def main_menu():
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text='🛒 JSON sotish'), KeyboardButton(text='📝 JSON tayyorlash')],
-            [KeyboardButton(text='💰 Balansim'), KeyboardButton(text='➕ Balans to‘ldirish')],
-            [KeyboardButton(text='💸 Pul chiqarish'), KeyboardButton(text='📦 Sotuvlarim')],
-            [KeyboardButton(text='📜 Tarix'), KeyboardButton(text='👤 Kabinet')],
-            [KeyboardButton(text='💳 Kartalarim'), KeyboardButton(text='🎁 Referal')],
-            [KeyboardButton(text='🔗 Link')],
-            [KeyboardButton(text='❓ Yordam')],
-        ], resize_keyboard=True
+            [KeyboardButton(text='🔗 Link'), KeyboardButton(text='💰 Balansim')],
+            [KeyboardButton(text='➕ Balans to‘ldirish'), KeyboardButton(text='💸 Pul chiqarish')],
+            [KeyboardButton(text='📦 Sotuvlarim'), KeyboardButton(text='📜 Tarix')],
+            [KeyboardButton(text='👤 Kabinet'), KeyboardButton(text='💳 Kartalarim')],
+            [KeyboardButton(text='🎁 Referal'), KeyboardButton(text='❓ Yordam')],
+        ], resize_keyboard=True, input_field_placeholder='Kerakli bo‘limni tanlang…'
     )
 
 def plans(rows, prefix='plan'):

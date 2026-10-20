@@ -45,7 +45,7 @@ class Database:
     except sqlite3.OperationalError:pass
    try:c.execute("ALTER TABLE json_service_orders ADD COLUMN source TEXT NOT NULL DEFAULT 'Ko‘rsatilmagan'")
    except sqlite3.OperationalError:pass
-   defaults={'min_withdrawal':'10000','help_text':'Yordam uchun admin bilan bog‘laning.','admin_username':'','membership_required':'0','official_channel_id':'','official_channel_link':'','payment_channel_id':'','json_service_price':'20000','ref_reward_json_sale':'1000','ref_reward_json_service':'1500','ref_reward_kiro_link':'2000','kiro_link_price':'0'}
+   defaults={'min_withdrawal':'10000','help_text':'Yordam uchun admin bilan bog‘laning.','admin_username':'','membership_required':'0','official_channel_id':'','official_channel_link':'','payment_channel_id':'','json_service_price':'20000','ref_reward_json_sale':'1000','ref_reward_json_service':'1000','ref_reward_kiro_link':'1000','kiro_link_price':'0'}
    for k,v in defaults.items(): c.execute('INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)',(k,v))
    # Migrate the old single-channel mandatory subscription setting into the new multi-chat table.
    old_chat=c.execute("SELECT value FROM settings WHERE key='official_channel_id'").fetchone()

@@ -26,17 +26,7 @@ async def start(message: Message, db: Database):
     try:
         parts=(message.text or '').split(maxsplit=1)
         if len(parts)>1 and parts[1].startswith('ref_'):
-            inviter_id = int(parts[1][4:])
-            attached = db.attach_referral(message.from_user.id, inviter_id)
-            if attached:
-                try:
-                    await message.bot.send_message(
-                        inviter_id,
-                        '🎉 <b>Yangi do‘st referalingiz orqali Kiro botga qo‘shildi!</b>\n\n'
-                        'Hozircha mukofot berilmadi. Do‘stingiz JSON sotuvini, JSON tayyorlatishni yoki Kiro Link to‘lovini amalga oshirib, admin tasdig‘idan o‘tgach, sizga tegishli referal mukofoti beriladi.',
-                        parse_mode='HTML')
-                except Exception:
-                    pass
+            db.attach_referral(message.from_user.id, int(parts[1][4:]))
     except (ValueError, TypeError):
         pass
     if u['blocked']:
@@ -59,7 +49,9 @@ async def start(message: Message, db: Database):
         '💸 <b>Pul chiqarish</b> — karta yoki telefon raqamiga pul oling\n'
         '📦 <b>Sotuvlarim</b> — barcha JSON buyurtmalaringiz\n'
         '📜 <b>Tarix</b> — pul harakatlari\n'
-        '💳 <b>Kartalarim</b> — kartani bir marta saqlang\n\n'
+        '💳 <b>Kartalarim</b> — kartani bir marta saqlang\n'
+        '🔗 <b>Link</b> — Kiro Link to‘lov havolasini so‘rash va kuzatish\n'
+        '🎁 <b>Referal</b> — do‘st taklif qilish va tasdiqlangan mukofotlarni ko‘rish\n\n'
         '📌 <b>Qoidalar:</b> faqat o‘zingizga tegishli va sotishga haqqingiz bor JSON yuboring.\n\n'
         '👇 Kerakli bo‘limni tanlang:'
     )
