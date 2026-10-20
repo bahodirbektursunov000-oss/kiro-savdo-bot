@@ -51,6 +51,7 @@ def admin_menu():
         [InlineKeyboardButton(text='💳 Balans kartalari',callback_data='adm:balancecards')],
         [InlineKeyboardButton(text='📜 Tranzaksiyalar',callback_data='adm:transactions'),InlineKeyboardButton(text='📢 Kanallar',callback_data='adm:channels')],
         [InlineKeyboardButton(text='🔐 Majburiy obuna',callback_data='adm:membership'),InlineKeyboardButton(text='📣 Hammaga xabar',callback_data='adm:broadcast')],
+        [InlineKeyboardButton(text='🔗 Link boshqaruvi',callback_data='adm:link')],
         [InlineKeyboardButton(text='🎁 Referal mukofotlari',callback_data='adm:referrals')],
         [InlineKeyboardButton(text='⚙️ Sozlamalar',callback_data='adm:settings'),InlineKeyboardButton(text='🗄 Backup',callback_data='adm:backup')]
     ])

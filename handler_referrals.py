@@ -18,7 +18,6 @@ def reward_keyboard():
         [InlineKeyboardButton(text='🛒 JSON sotish mukofoti', callback_data='refset:json_sale')],
         [InlineKeyboardButton(text='📝 JSON tayyorlatish mukofoti', callback_data='refset:json_service')],
         [InlineKeyboardButton(text='🔗 Kiro Link to‘lovi mukofoti', callback_data='refset:kiro_link')],
-        [InlineKeyboardButton(text='💳 Kiro Link xizmat narxi', callback_data='kiroprice')],
         [InlineKeyboardButton(text='🔙 Admin panel', callback_data='adm:home')],
     ])
 

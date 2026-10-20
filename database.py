@@ -45,7 +45,7 @@ class Database:
     except sqlite3.OperationalError:pass
    try:c.execute("ALTER TABLE json_service_orders ADD COLUMN source TEXT NOT NULL DEFAULT 'Ko‘rsatilmagan'")
    except sqlite3.OperationalError:pass
-   defaults={'min_withdrawal':'10000','help_text':'Yordam uchun admin bilan bog‘laning.','admin_username':'','membership_required':'0','official_channel_id':'','official_channel_link':'','payment_channel_id':'','json_service_price':'20000','ref_reward_json_sale':'1000','ref_reward_json_service':'1000','ref_reward_kiro_link':'1000','kiro_link_price':'0'}
+   defaults={'min_withdrawal':'10000','help_text':'Yordam uchun admin bilan bog‘laning.','admin_username':'','membership_required':'0','official_channel_id':'','official_channel_link':'','payment_channel_id':'','json_service_price':'20000','ref_reward_json_sale':'1000','ref_reward_json_service':'1000','ref_reward_kiro_link':'1000','kiro_link_price':'0','kiro_link_enabled':'1'}
    for k,v in defaults.items(): c.execute('INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)',(k,v))
    # Migrate the old single-channel mandatory subscription setting into the new multi-chat table.
    old_chat=c.execute("SELECT value FROM settings WHERE key='official_channel_id'").fetchone()
@@ -100,6 +100,8 @@ class Database:
    return cur.rowcount==1
  def kiro_link_history(self, user_tg):
   with self.conn() as c:return c.execute('SELECT * FROM kiro_link_requests WHERE user_tg=? ORDER BY id DESC LIMIT 20',(int(user_tg),)).fetchall()
+ def all_kiro_link_requests(self, limit=100):
+  with self.conn() as c:return c.execute('SELECT k.*,u.username,u.full_name FROM kiro_link_requests k LEFT JOIN users u ON u.telegram_user_id=k.user_tg ORDER BY k.id DESC LIMIT ?',(int(limit),)).fetchall()
  def attach_referral(self, invited_tg, inviter_tg):
   if not inviter_tg or int(inviter_tg)==int(invited_tg): return False
   with self.conn() as c:

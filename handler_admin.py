@@ -600,7 +600,7 @@ async def jsdeliver(c:CallbackQuery,state:FSMContext,db:Database,config:Config):
  if not o or o['status']!='pending':return await c.answer('Buyurtma topilmadi yoki yakunlangan.',show_alert=True)
  await state.update_data(deliver_json_service=oid)
  await state.set_state(AdminStates.deliver_json_service)
- await c.message.answer(f'📤 <b>#{oid}</b> uchun tayyorlangan JSONni yuboring.\n\nQabul qilinadi: <code>.json</code> yoki <code>.txt</code>.\nBot JSONni tekshiradi, chiroyli 2-space formatga keltiradi va foydalanuvchiga <b>.txt</b> ko‘rinishida yuboradi.',parse_mode='HTML')
+ await c.message.answer(f'📤 <b>#{oid}</b> uchun tayyor JSONni yuboring.\n\nMatn yoki .json/.txt fayl yuborishingiz mumkin. Bot mazmunini qayta formatlamaydi: admin yuborgan ko‘rinish saqlanadi. Foydalanuvchiga matn va fayl varianti yuboriladi.',parse_mode='HTML')
  await c.answer()
 
 @router.message(AdminStates.deliver_json_service,F.text)
@@ -610,20 +610,18 @@ async def jsdeliver_text(m:Message,state:FSMContext,db:Database,config:Config):
   if not o or o['status']!='pending':
    await state.clear(); return await m.answer('❌ Buyurtma topilmadi yoki allaqachon yakunlangan.')
   try:
-   from json_service import validate_json
-   formatted=validate_json(m.text)
-   await m.bot.send_document(o['telegram_user_id'],BufferedInputFile(formatted.encode('utf-8'),filename=f'json_{oid}.txt'),caption=f'✅ <b>JSON #{oid} tayyor!</b>\n\n📄 Toza, tekshirilgan JSON <b>.txt</b> formatida yuborildi.',parse_mode='HTML')
-  except ValueError as e:
-   return await m.answer(f'❌ JSON sifati/xatosi: {e}')
+   # Admin matn yuborgan bo‘lsa, aynan shu Telegram xabarini ko‘chiramiz.
+   # Hech qanday fayl yaratmaymiz, prefix qo‘shmaymiz va matnni qayta formatlamaymiz.
+   await m.bot.copy_message(chat_id=o['telegram_user_id'], from_chat_id=m.chat.id, message_id=m.message_id)
   except Exception:
    return await m.answer('❌ Foydalanuvchiga yuborib bo‘lmadi. Buyurtma yopilmadi.')
   if not db.complete_json_service_order(oid,m.from_user.id):
-   return await m.answer('⚠️ Fayl yuborildi, lekin buyurtma holatini yangilashda muammo bo‘ldi.')
+   return await m.answer('⚠️ Xabar yuborildi, lekin buyurtma holatini yangilashda muammo bo‘ldi.')
   reward=db.credit_referral_reward(o['telegram_user_id'],'json_service',oid)
   if reward:
    try: await m.bot.send_message(reward['inviter_tg'],f'🎉 Referal mukofoti! Do‘stingiz JSON tayyorlatish xizmatini yakunladi va admin tasdiqladi. 💰 +{format_money(reward["amount"])} balansingizga qo‘shildi.')
    except Exception: pass
-  await state.clear(); await m.answer(f'✅ JSON #{oid} foydalanuvchiga yuborildi va buyurtma yakunlandi.',reply_markup=admin_menu())
+  await state.clear(); await m.answer(f'✅ JSON #{oid} matn ko‘rinishida aynan yuborilganidek yetkazildi.',reply_markup=admin_menu())
 
 @router.message(AdminStates.deliver_json_service,F.document)
 async def jsdeliver_file(m:Message,state:FSMContext,db:Database,config:Config):
@@ -631,30 +629,23 @@ async def jsdeliver_file(m:Message,state:FSMContext,db:Database,config:Config):
  d=await state.get_data();oid=int(d['deliver_json_service']);o=db.json_service_order(oid)
  if not o or o['status']!='pending':
   await state.clear();return await m.answer('❌ Buyurtma topilmadi yoki allaqachon yakunlangan.')
- name=(m.document.file_name or '').lower()
- if not (name.endswith('.json') or name.endswith('.txt')):
-  return await m.answer('❌ Faqat .json yoki .txt fayl yuboring.')
+ name=m.document.file_name or ''
+ if not name.lower().endswith('.json'):
+  return await m.answer('❌ JSON fayl yuboring. Bot admin yuborgan faylni aynan o‘z holida ko‘chiradi.')
  try:
-  tg_file=await m.bot.get_file(m.document.file_id)
-  buf=BytesIO()
-  await m.bot.download_file(tg_file.file_path,destination=buf)
-  raw=buf.getvalue().decode('utf-8-sig')
-  formatted=__import__('json_service').validate_json(raw)
-  await m.bot.send_document(o['telegram_user_id'],BufferedInputFile(formatted.encode('utf-8'),filename=f'json_{oid}.txt'),caption=f'✅ <b>JSON #{oid} tayyor!</b>\n\n📄 Toza, tekshirilgan JSON <b>.txt</b> formatida yuborildi.',parse_mode='HTML')
- except UnicodeDecodeError:
-  return await m.answer('❌ Fayl UTF-8 formatida bo‘lishi kerak.')
- except ValueError as e:
-  return await m.answer(f'❌ JSON sifati/xatosi: {e}')
+  # copy_message Telegram’dagi original hujjatni ko‘chiradi: fayl nomi va baytlari
+  # qayta yaratilmaydi, .txt ga aylantirilmaydi va qo‘shimcha matn yuborilmaydi.
+  await m.bot.copy_message(chat_id=o['telegram_user_id'], from_chat_id=m.chat.id, message_id=m.message_id)
  except Exception:
   return await m.answer('❌ Foydalanuvchiga yuborib bo‘lmadi. Buyurtma yopilmadi.')
  if not db.complete_json_service_order(oid,m.from_user.id):
-  return await m.answer('⚠️ Fayl yuborildi, lekin buyurtma holatini yangilashda muammo bo‘ldi. Qayta yubormang, bazani tekshirish kerak.')
+  return await m.answer('⚠️ Fayl yuborildi, lekin buyurtma holatini yangilashda muammo bo‘ldi. Qayta yubormang, bazani tekshiring.')
  reward=db.credit_referral_reward(o['telegram_user_id'],'json_service',oid)
  if reward:
   try: await m.bot.send_message(reward['inviter_tg'],f'🎉 Referal mukofoti! Do‘stingiz JSON tayyorlatish xizmatini yakunladi va admin tasdiqladi. 💰 +{format_money(reward["amount"])} balansingizga qo‘shildi.')
   except Exception: pass
  await state.clear()
- await m.answer(f'✅ JSON #{oid} foydalanuvchiga yuborildi va buyurtma yakunlandi.',reply_markup=admin_menu())
+ await m.answer(f'✅ JSON #{oid} asl .json fayl sifatida o‘zgartirilmasdan yetkazildi.',reply_markup=admin_menu())
 
 @router.message(AdminStates.deliver_json_service)
 async def jsdeliver_wrong(m:Message,config:Config):

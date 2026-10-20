@@ -1,4 +1,5 @@
 from aiogram import Router, F
+from html import escape
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from database import Database
@@ -30,12 +31,15 @@ async def kiro_price(c:CallbackQuery,state:FSMContext,db:Database,config:Config)
 
 @router.message(F.text=='🔗 Link')
 async def link_menu(m:Message,db:Database):
+ if db.setting('kiro_link_enabled','1') != '1':
+  return await m.answer('🔗 Kiro Link xizmati vaqtincha o‘chirilgan. Keyinroq urinib ko‘ring.')
  price=int(db.setting('kiro_link_price','0') or 0)
  kb=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='📩 Link so‘rash',callback_data='kirorequest')],[InlineKeyboardButton(text='📋 Linklarim',callback_data='kirohistory')]])
  await m.answer(f'🔗 <b>KIRO LINK XIZMATI</b>\n\nNarx: <b>{format_money(price)}</b>\nTo‘lov linki admin tomonidan yuboriladi. To‘lov tekshirilgach admin tasdiqlaydi. Bu xizmat balans to‘ldirishdan alohida.',parse_mode='HTML',reply_markup=kb)
 
 @router.callback_query(F.data=='kirorequest')
 async def request_link(c:CallbackQuery,db:Database,config:Config):
+ if db.setting('kiro_link_enabled','1') != '1': return await c.answer('Link xizmati vaqtincha o‘chirilgan.',show_alert=True)
  rid=db.create_kiro_link_request(c.from_user.id)
  await c.message.answer(f'✅ Link so‘rovingiz qabul qilindi. Buyurtma: #{rid}\nAdmin sizga to‘lov linkini yuboradi.')
  for aid in config.admin_ids:
@@ -100,7 +104,10 @@ async def cancel_link(c:CallbackQuery,db:Database):
  rid=int(c.data.split(':')[1]);r=db.kiro_link_request(rid)
  if not r or r['user_tg']!=c.from_user.id:return await c.answer('So‘rov topilmadi.',show_alert=True)
  if r['status'] not in ('requested','link_sent'):return await c.answer('Bu holatda bekor qilib bo‘lmaydi.',show_alert=True)
- db.set_kiro_link_status(rid,'cancelled')
+ if not db.set_kiro_link_status(rid,'cancelled'): return await c.answer('Bekor qilib bo‘lmadi. Holatni tekshiring.',show_alert=True)
+ try: await c.bot.send_message(c.from_user.id,f'❌ Link so‘rovi #{rid} bekor qilindi.')
+ except Exception: pass
+ await c.message.edit_reply_markup(reply_markup=None)
  await c.answer('So‘rov bekor qilindi.')
 
 @router.callback_query(F.data.startswith('kiroconfirm:'))
@@ -127,3 +134,31 @@ async def reject_link(c:CallbackQuery,db:Database,config:Config):
  try:await c.bot.send_message(r['user_tg'],f'❌ Kiro Link #{rid} to‘lovi tasdiqlanmadi. Agar xato bo‘lsa, admin bilan bog‘laning.')
  except Exception:pass
  await c.answer('Rad etildi.')
+
+
+@router.callback_query(F.data == 'adm:link')
+async def admin_link_panel(c: CallbackQuery, db: Database, config: Config):
+ if c.from_user.id not in config.admin_ids: return await c.answer('Ruxsat yo‘q.', show_alert=True)
+ enabled=db.setting('kiro_link_enabled','1') == '1'
+ rows=db.all_kiro_link_requests(50)
+ kb=InlineKeyboardMarkup(inline_keyboard=[
+  [InlineKeyboardButton(text=('🔴 Link xizmatini o‘chirish' if enabled else '🟢 Link xizmatini yoqish'),callback_data='adm:linktoggle')],
+  [InlineKeyboardButton(text='🔄 Yangilash',callback_data='adm:link')]
+ ])
+ await c.message.answer(f'🔗 <b>LINK BOSHQARUVI</b>\nHolati: <b>{"YOQILGAN" if enabled else "O‘CHIRILGAN"}</b>\n\nOxirgi {len(rows)} ta so‘rov:',parse_mode='HTML',reply_markup=kb)
+ labels={'requested':'So‘rov keldi','link_sent':'Link yuborildi','payment_reported':'To‘lov tekshirilsin','paid':'To‘landi','rejected':'Rad etildi','cancelled':'Bekor qilindi','issue':'Link muammosi'}
+ for r in rows:
+  user=f'@{r["username"]}' if r['username'] else (r['full_name'] or 'Foydalanuvchi')
+  url=r['payment_url'] or 'Link berilmagan'
+  msg=f'🔗 <b>So‘rov #{r["id"]}</b>\n👤 {escape(user)}\n🆔 <code>{r["user_tg"]}</code>\n📌 {labels.get(r["status"],r["status"])}\n🌐 {escape(url)}'
+  await c.message.answer(msg,parse_mode='HTML',reply_markup=admin_link_actions(r['id']))
+ if not rows: await c.message.answer('Hozircha link so‘rovlari yo‘q.')
+ await c.answer()
+
+@router.callback_query(F.data == 'adm:linktoggle')
+async def admin_link_toggle(c: CallbackQuery, db: Database, config: Config):
+ if c.from_user.id not in config.admin_ids: return await c.answer('Ruxsat yo‘q.',show_alert=True)
+ enabled=db.setting('kiro_link_enabled','1') == '1'
+ db.set_setting('kiro_link_enabled','0' if enabled else '1')
+ await c.answer('Link xizmati ' + ('o‘chirildi.' if enabled else 'yoqildi.'),show_alert=True)
+ await admin_link_panel(c,db,config)

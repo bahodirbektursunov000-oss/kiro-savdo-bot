@@ -36,3 +36,7 @@ Taklif qilingan foydalanuvchi botga kirgani uchun mukofot berilmaydi. JSON sotis
 
 ## Tekshiruv
 Python fayllari `py_compile` orqali sintaksis tekshiruvidan o‘tkazilgan. To‘liq bot integratsion sinovi bajarilmadi, chunki tekshiruv muhitida `aiogram` o‘rnatilmagan.
+
+
+## JSON tayyorlash — asl nusxani saqlash
+Admin matn yuborsa, bot matnni qayta formatlamasdan foydalanuvchiga matn va `.json` fayl sifatida yuboradi. Admin `.json`/`.txt` fayl yuborsa, bot fayl baytlarini o‘zgartirmasdan, asl fayl nomi bilan yetkazishga harakat qiladi. Matn ko‘rinishi Telegram xabar chegarasi bilan cheklangan; katta JSON fayl sifatida beriladi.
