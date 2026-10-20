@@ -15,11 +15,20 @@ def user_link_actions(rid):
   [InlineKeyboardButton(text='⚠️ Link ishlamadi',callback_data=f'kiroissue:{rid}'),InlineKeyboardButton(text='❌ Bekor qilish',callback_data=f'kirocancel:{rid}')]
  ])
 
-def admin_link_actions(rid):
- return InlineKeyboardMarkup(inline_keyboard=[
-  [InlineKeyboardButton(text='🔗 To‘lov linkini yuborish',callback_data=f'kiroseturl:{rid}')],
-  [InlineKeyboardButton(text='✅ To‘lovni tasdiqlash',callback_data=f'kiroconfirm:{rid}'),InlineKeyboardButton(text='❌ Rad etish',callback_data=f'kiroreject:{rid}')]
- ])
+def admin_link_actions(rid, status='requested'):
+ # Show only actions valid for the request's current status.
+ if status == 'requested':
+  rows = [[InlineKeyboardButton(text='🔗 To‘lov linkini yuborish', callback_data=f'kiroseturl:{rid}')],
+          [InlineKeyboardButton(text='❌ So‘rovni rad etish', callback_data=f'kiroreject:{rid}')]]
+ elif status == 'link_sent':
+  rows = [[InlineKeyboardButton(text='🔗 Linkni qayta yuborish', callback_data=f'kiroseturl:{rid}')],
+          [InlineKeyboardButton(text='❌ Rad etish', callback_data=f'kiroreject:{rid}')]]
+ elif status == 'payment_reported':
+  rows = [[InlineKeyboardButton(text='✅ To‘lovni tasdiqlash', callback_data=f'kiroconfirm:{rid}'),
+           InlineKeyboardButton(text='❌ To‘lovni rad etish', callback_data=f'kiroreject:{rid}')]]
+ else:
+  rows = []
+ return InlineKeyboardMarkup(inline_keyboard=rows) if rows else None
 
 @router.callback_query(F.data=='kiroprice')
 async def kiro_price(c:CallbackQuery,state:FSMContext,db:Database,config:Config):
@@ -43,7 +52,7 @@ async def request_link(c:CallbackQuery,db:Database,config:Config):
  rid=db.create_kiro_link_request(c.from_user.id)
  await c.message.answer(f'✅ Link so‘rovingiz qabul qilindi. Buyurtma: #{rid}\nAdmin sizga to‘lov linkini yuboradi.')
  for aid in config.admin_ids:
-  try:await c.bot.send_message(aid,f'🔗 <b>KIRO LINK SO‘ROVI #{rid}</b>\n👤 {c.from_user.full_name}\n🆔 <code>{c.from_user.id}</code>',parse_mode='HTML',reply_markup=admin_link_actions(rid))
+  try:await c.bot.send_message(aid,f'🔗 <b>KIRO LINK SO‘ROVI #{rid}</b>\n👤 {c.from_user.full_name}\n🆔 <code>{c.from_user.id}</code>',parse_mode='HTML',reply_markup=admin_link_actions(rid, 'requested'))
   except Exception:pass
  await c.answer('So‘rov yuborildi.')
 
@@ -60,7 +69,10 @@ async def history(c:CallbackQuery,db:Database):
 async def set_url_start(c:CallbackQuery,state:FSMContext,config:Config,db:Database):
  if c.from_user.id not in config.admin_ids:return await c.answer('Ruxsat yo‘q.',show_alert=True)
  rid=int(c.data.split(':')[1]);r=db.kiro_link_request(rid)
- if not r or r['status']!='requested':return await c.answer('So‘rov topilmadi yoki link yuborilgan.',show_alert=True)
+ if not r:
+  return await c.answer('So‘rov bazadan topilmadi. Botni yangilab, admin paneldan qayta oching.', show_alert=True)
+ if r['status'] not in ('requested', 'link_sent'):
+  return await c.answer(f'Bu so‘rovning holati: {r["status"]}. Bu holatda link yuborib bo‘lmaydi.', show_alert=True)
  await state.update_data(kiro_link_request_id=rid);await state.set_state(AdminStates.link_admin_url)
  await c.message.answer(f'#{rid} uchun to‘lov URL manzilini yuboring (https:// bilan boshlansin).')
  await c.answer()
@@ -71,8 +83,10 @@ async def set_url(m:Message,state:FSMContext,db:Database,config:Config):
  url=m.text.strip()
  if not url.startswith('https://') or len(url)>1500:return await m.answer('❌ To‘g‘ri https:// URL yuboring.')
  d=await state.get_data();rid=int(d['kiro_link_request_id']);r=db.kiro_link_request(rid)
- if not r or not db.set_kiro_payment_url(rid,url):
-  await state.clear();return await m.answer('❌ So‘rov topilmadi yoki holati o‘zgargan.')
+ if not r:
+  await state.clear(); return await m.answer(f'❌ #{rid} so‘rovi bazadan topilmadi. Admin panelni yangilang.')
+ if not db.set_kiro_payment_url(rid,url):
+  await state.clear(); return await m.answer(f'❌ #{rid} holati “{r["status"]}”. Link saqlanmadi. Admin panelni yangilang va qayta urinib ko‘ring.')
  await state.clear()
  try:await m.bot.send_message(r['user_tg'],f'🔗 <b>KIRO TO‘LOV LINKI</b>\nBuyurtma: #{rid}\n\n{url}\n\nTo‘lovni amalga oshirgach “To‘ladim” tugmasini bosing. Admin to‘lovni alohida tekshiradi.',parse_mode='HTML',reply_markup=user_link_actions(rid))
  except Exception:await m.answer('⚠️ Link saqlandi, lekin foydalanuvchiga yuborilmadi.')
@@ -84,7 +98,7 @@ async def paid_report(c:CallbackQuery,db:Database,config:Config):
  if not r or r['user_tg']!=c.from_user.id or r['status']!='link_sent':return await c.answer('Bu so‘rovni yuborib bo‘lmaydi.',show_alert=True)
  db.set_kiro_link_status(rid,'payment_reported')
  for aid in config.admin_ids:
-  try:await c.bot.send_message(aid,f'💳 Foydalanuvchi “To‘ladim” dedi. To‘lovni provayderdan tekshiring.\nSo‘rov #{rid}\nUser ID: {c.from_user.id}',reply_markup=admin_link_actions(rid))
+  try:await c.bot.send_message(aid,f'💳 Foydalanuvchi “To‘ladim” dedi. To‘lovni provayderdan tekshiring.\nSo‘rov #{rid}\nUser ID: {c.from_user.id}',reply_markup=admin_link_actions(rid, 'payment_reported'))
   except Exception:pass
  await c.message.answer('⏳ Admin to‘lovni tekshiradi. Tugmani bosishning o‘zi to‘lov tasdig‘i emas.')
  await c.answer('Adminga yuborildi.')
@@ -129,8 +143,11 @@ async def confirm_link(c:CallbackQuery,db:Database,config:Config):
 async def reject_link(c:CallbackQuery,db:Database,config:Config):
  if c.from_user.id not in config.admin_ids:return await c.answer('Ruxsat yo‘q.',show_alert=True)
  rid=int(c.data.split(':')[1]);r=db.kiro_link_request(rid)
- if not r or r['status'] not in ('payment_reported','link_sent'):return await c.answer('So‘rov topilmadi yoki holati o‘zgargan.',show_alert=True)
- db.set_kiro_link_status(rid,'rejected')
+ if not r:return await c.answer('So‘rov bazadan topilmadi.',show_alert=True)
+ if r['status'] not in ('requested','link_sent','payment_reported'):
+  return await c.answer(f'Bu so‘rov allaqachon yakunlangan: {r["status"]}.',show_alert=True)
+ if not db.set_kiro_link_status(rid,'rejected'):
+  return await c.answer('Holatni o‘zgartirib bo‘lmadi. Panelni yangilang.',show_alert=True)
  try:await c.bot.send_message(r['user_tg'],f'❌ Kiro Link #{rid} to‘lovi tasdiqlanmadi. Agar xato bo‘lsa, admin bilan bog‘laning.')
  except Exception:pass
  await c.answer('Rad etildi.')
@@ -152,7 +169,7 @@ async def admin_link_panel(c: CallbackQuery, db: Database, config: Config):
   user=f'@{r["username"]}' if r['username'] else (r['full_name'] or 'Foydalanuvchi')
   url=r['payment_url'] or 'Link berilmagan'
   msg=f'🔗 <b>So‘rov #{r["id"]}</b>\n👤 {escape(user)}\n🆔 <code>{r["user_tg"]}</code>\n📌 {labels.get(r["status"],r["status"])}\n🌐 {escape(url)}'
-  await c.message.answer(msg,parse_mode='HTML',reply_markup=admin_link_actions(r['id']))
+  await c.message.answer(msg,parse_mode='HTML',reply_markup=admin_link_actions(r['id'], r['status']))
  if not rows: await c.message.answer('Hozircha link so‘rovlari yo‘q.')
  await c.answer()
 

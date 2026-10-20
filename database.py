@@ -96,7 +96,7 @@ class Database:
   with self.conn() as c:return c.execute('SELECT * FROM kiro_link_requests WHERE id=?',(int(request_id),)).fetchone()
  def set_kiro_payment_url(self, request_id, url):
   with self.conn() as c:
-   cur=c.execute("UPDATE kiro_link_requests SET payment_url=?,status='link_sent',updated_at=? WHERE id=? AND status='requested'",(url,now(),int(request_id)))
+   cur=c.execute("UPDATE kiro_link_requests SET payment_url=?,status='link_sent',updated_at=? WHERE id=? AND status IN ('requested','link_sent')",(url,now(),int(request_id)))
    return cur.rowcount==1
  def set_kiro_link_status(self, request_id, status):
   with self.conn() as c:
