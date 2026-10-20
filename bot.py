@@ -136,10 +136,6 @@ async def main():
             return await c.answer('✅ Tasdiqlandi')
         await c.answer('❌ Hali barcha kanal/guruhlarga obuna bo‘lmagansiz.', show_alert=True)
 
-    @dp.callback_query()
-    async def unknown_button(c: CallbackQuery):
-        await c.answer('Tugma eskirgan. /start ni bosib qayta urinib ko‘ring.', show_alert=True)
-
     await bot.set_my_commands([
         BotCommand(command='start', description='Botni boshlash'),
         BotCommand(command='cancel', description='Joriy amalni bekor qilish'),
