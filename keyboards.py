@@ -1,7 +1,7 @@
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from payment_service import format_money
 
-MENU = ['🛒 JSON sotish','📝 JSON tayyorlash','💰 Balansim','➕ Balans to‘ldirish','💸 Pul chiqarish','📦 Sotuvlarim','📜 Tarix','👤 Kabinet','💳 Kartalarim','❓ Yordam']
+MENU = ['🛒 JSON sotish','📝 JSON tayyorlash','💰 Balansim','➕ Balans to‘ldirish','💸 Pul chiqarish','📦 Sotuvlarim','📜 Tarix','👤 Kabinet','💳 Kartalarim','🎁 Referal','🔗 Link','❓ Yordam']
 
 def main_menu():
     return ReplyKeyboardMarkup(
@@ -10,7 +10,9 @@ def main_menu():
             [KeyboardButton(text='💰 Balansim'), KeyboardButton(text='➕ Balans to‘ldirish')],
             [KeyboardButton(text='💸 Pul chiqarish'), KeyboardButton(text='📦 Sotuvlarim')],
             [KeyboardButton(text='📜 Tarix'), KeyboardButton(text='👤 Kabinet')],
-            [KeyboardButton(text='💳 Kartalarim'), KeyboardButton(text='❓ Yordam')],
+            [KeyboardButton(text='💳 Kartalarim'), KeyboardButton(text='🎁 Referal')],
+            [KeyboardButton(text='🔗 Link')],
+            [KeyboardButton(text='❓ Yordam')],
         ], resize_keyboard=True
     )
 
@@ -50,6 +52,7 @@ def admin_menu():
         [InlineKeyboardButton(text='💳 Balans kartalari',callback_data='adm:balancecards')],
         [InlineKeyboardButton(text='📜 Tranzaksiyalar',callback_data='adm:transactions'),InlineKeyboardButton(text='📢 Kanallar',callback_data='adm:channels')],
         [InlineKeyboardButton(text='🔐 Majburiy obuna',callback_data='adm:membership'),InlineKeyboardButton(text='📣 Hammaga xabar',callback_data='adm:broadcast')],
+        [InlineKeyboardButton(text='🎁 Referal mukofotlari',callback_data='adm:referrals')],
         [InlineKeyboardButton(text='⚙️ Sozlamalar',callback_data='adm:settings'),InlineKeyboardButton(text='🗄 Backup',callback_data='adm:backup')]
     ])
 

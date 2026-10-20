@@ -49,3 +49,5 @@ class AdminStates(StatesGroup):
     reject_topup = State()
     add_required_chat_id = State()
     add_required_chat_link = State()
+    referral_reward_value = State()
+    link_admin_url = State()

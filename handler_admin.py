@@ -85,6 +85,10 @@ async def approve(c:CallbackQuery,db:Database,config:Config):
  if not adm(c.from_user.id,config):return await deny(c)
  sid=int(c.data.split(':')[1]);s=db.review_submission(sid,'approved')
  if not s:return await c.answer('Bu JSON tasdiqlanmaydi.',show_alert=True)
+ reward=db.credit_referral_reward(s['telegram_user_id'],'json_sale',sid)
+ if reward:
+  try: await c.bot.send_message(reward['inviter_tg'],f'🎉 Referal mukofoti! Taklif qilgan do‘stingiz JSON sotuvini yakunladi va admin tasdiqladi. 💰 +{format_money(reward["amount"])} balansingizga qo‘shildi.')
+  except Exception: pass
  await c.message.edit_reply_markup(reply_markup=None);await c.message.answer(f'✅ JSON #{sid} tasdiqlandi.');
  try:await c.bot.send_message(s['telegram_user_id'],f'✅ JSON #{sid} tasdiqlandi.\n💰 +{format_money(s["price"])} balansga qo‘shildi.')
  except Exception:pass
@@ -615,6 +619,10 @@ async def jsdeliver_text(m:Message,state:FSMContext,db:Database,config:Config):
    return await m.answer('❌ Foydalanuvchiga yuborib bo‘lmadi. Buyurtma yopilmadi.')
   if not db.complete_json_service_order(oid,m.from_user.id):
    return await m.answer('⚠️ Fayl yuborildi, lekin buyurtma holatini yangilashda muammo bo‘ldi.')
+  reward=db.credit_referral_reward(o['telegram_user_id'],'json_service',oid)
+  if reward:
+   try: await m.bot.send_message(reward['inviter_tg'],f'🎉 Referal mukofoti! Do‘stingiz JSON tayyorlatish xizmatini yakunladi va admin tasdiqladi. 💰 +{format_money(reward["amount"])} balansingizga qo‘shildi.')
+   except Exception: pass
   await state.clear(); await m.answer(f'✅ JSON #{oid} foydalanuvchiga yuborildi va buyurtma yakunlandi.',reply_markup=admin_menu())
 
 @router.message(AdminStates.deliver_json_service,F.document)
@@ -641,6 +649,10 @@ async def jsdeliver_file(m:Message,state:FSMContext,db:Database,config:Config):
   return await m.answer('❌ Foydalanuvchiga yuborib bo‘lmadi. Buyurtma yopilmadi.')
  if not db.complete_json_service_order(oid,m.from_user.id):
   return await m.answer('⚠️ Fayl yuborildi, lekin buyurtma holatini yangilashda muammo bo‘ldi. Qayta yubormang, bazani tekshirish kerak.')
+ reward=db.credit_referral_reward(o['telegram_user_id'],'json_service',oid)
+ if reward:
+  try: await m.bot.send_message(reward['inviter_tg'],f'🎉 Referal mukofoti! Do‘stingiz JSON tayyorlatish xizmatini yakunladi va admin tasdiqladi. 💰 +{format_money(reward["amount"])} balansingizga qo‘shildi.')
+  except Exception: pass
  await state.clear()
  await m.answer(f'✅ JSON #{oid} foydalanuvchiga yuborildi va buyurtma yakunlandi.',reply_markup=admin_menu())
 

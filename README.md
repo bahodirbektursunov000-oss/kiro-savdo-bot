@@ -54,3 +54,11 @@ For mandatory subscription, configure the official channel ID/link and make the 
 - Multi-channel/group mandatory subscription
 - Payment-channel masked user names
 - Interface guide: `../INTERFACE_GUIDE.md`
+
+
+## Kiro Link va referal
+- Foydalanuvchi `🎁 Referal` bo‘limidan shaxsiy `start=ref_<telegram_id>` havolasini oladi.
+- Mukofotlar admin panelidagi `🎁 Referal mukofotlari` bo‘limidan boshqariladi.
+- Mukofot faqat admin tasdiqlagan JSON sotuv, JSON xizmati yoki Kiro Link to‘lovidan keyin beriladi.
+- `🔗 Link` bo‘limida foydalanuvchi link so‘raydi; admin to‘lov URL manzilini qo‘lda yuboradi va real to‘lovni tekshirgandan keyin tasdiqlaydi.
+- Kiro Link to‘lovlari avtomatik tekshirilmaydi: provayder API/webhook ulanmaguncha admin to‘lovni tashqi panelda tekshirishi shart.

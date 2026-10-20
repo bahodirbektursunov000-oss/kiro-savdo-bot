@@ -23,6 +23,22 @@ async def is_member(message: Message, db: Database):
 @router.message(CommandStart())
 async def start(message: Message, db: Database):
     u = db.ensure_user(message.from_user)
+    try:
+        parts=(message.text or '').split(maxsplit=1)
+        if len(parts)>1 and parts[1].startswith('ref_'):
+            inviter_id = int(parts[1][4:])
+            attached = db.attach_referral(message.from_user.id, inviter_id)
+            if attached:
+                try:
+                    await message.bot.send_message(
+                        inviter_id,
+                        '🎉 <b>Yangi do‘st referalingiz orqali Kiro botga qo‘shildi!</b>\n\n'
+                        'Hozircha mukofot berilmadi. Do‘stingiz JSON sotuvini, JSON tayyorlatishni yoki Kiro Link to‘lovini amalga oshirib, admin tasdig‘idan o‘tgach, sizga tegishli referal mukofoti beriladi.',
+                        parse_mode='HTML')
+                except Exception:
+                    pass
+    except (ValueError, TypeError):
+        pass
     if u['blocked']:
         return await message.answer('⛔ Sizning hisobingiz bloklangan.')
     if db.setting('membership_required', '0') == '1' and not await is_member(message, db):

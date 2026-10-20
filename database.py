@@ -14,7 +14,7 @@ class Database:
  def init(self):
   with self.conn() as c:
    c.executescript('''
-   CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,telegram_user_id INTEGER UNIQUE NOT NULL,username TEXT,full_name TEXT NOT NULL,created_at TEXT NOT NULL,last_seen TEXT NOT NULL,balance INTEGER NOT NULL DEFAULT 0,blocked INTEGER NOT NULL DEFAULT 0,blocked_until TEXT);
+   CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,telegram_user_id INTEGER UNIQUE NOT NULL,username TEXT,full_name TEXT NOT NULL,created_at TEXT NOT NULL,last_seen TEXT NOT NULL,balance INTEGER NOT NULL DEFAULT 0,blocked INTEGER NOT NULL DEFAULT 0,blocked_until TEXT,referred_by_tg INTEGER);
    CREATE TABLE IF NOT EXISTS json_submissions(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,plan TEXT NOT NULL,json_text TEXT NOT NULL,price INTEGER NOT NULL,status TEXT NOT NULL DEFAULT 'pending',reject_reason TEXT,created_at TEXT NOT NULL,reviewed_at TEXT,FOREIGN KEY(user_id) REFERENCES users(id));
    CREATE TABLE IF NOT EXISTS withdrawals(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,amount INTEGER NOT NULL,payment_method TEXT NOT NULL,recipient TEXT NOT NULL,note TEXT,status TEXT NOT NULL DEFAULT 'pending',requested_at TEXT NOT NULL,paid_at TEXT,payment_id TEXT,reject_reason TEXT,paid_by_id INTEGER,paid_by_username TEXT,FOREIGN KEY(user_id) REFERENCES users(id));
    CREATE TABLE IF NOT EXISTS payment_methods(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT UNIQUE NOT NULL,details TEXT NOT NULL DEFAULT '',note TEXT NOT NULL DEFAULT '',enabled INTEGER NOT NULL DEFAULT 1,created_at TEXT NOT NULL);
@@ -27,9 +27,11 @@ class Database:
    CREATE TABLE IF NOT EXISTS balance_cards(id INTEGER PRIMARY KEY AUTOINCREMENT,label TEXT NOT NULL,number TEXT NOT NULL UNIQUE,note TEXT NOT NULL DEFAULT '',enabled INTEGER NOT NULL DEFAULT 1,created_at TEXT NOT NULL);
    CREATE TABLE IF NOT EXISTS balance_topups(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,amount INTEGER NOT NULL,card_id INTEGER NOT NULL,proof_type TEXT NOT NULL,proof TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending',created_at TEXT NOT NULL,reviewed_at TEXT,reject_reason TEXT,reviewed_by_id INTEGER,reviewed_by_username TEXT,FOREIGN KEY(user_id) REFERENCES users(id),FOREIGN KEY(card_id) REFERENCES balance_cards(id));
    CREATE TABLE IF NOT EXISTS json_service_orders(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,price INTEGER NOT NULL,request_text TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'pending',created_at TEXT NOT NULL,completed_at TEXT,reject_reason TEXT,admin_id INTEGER,FOREIGN KEY(user_id) REFERENCES users(id));
+   CREATE TABLE IF NOT EXISTS referral_rewards(id INTEGER PRIMARY KEY AUTOINCREMENT, inviter_tg INTEGER NOT NULL, invited_tg INTEGER NOT NULL, operation_type TEXT NOT NULL, operation_id INTEGER NOT NULL, amount INTEGER NOT NULL, created_at TEXT NOT NULL, UNIQUE(operation_type,operation_id));
+   CREATE TABLE IF NOT EXISTS kiro_link_requests(id INTEGER PRIMARY KEY AUTOINCREMENT,user_tg INTEGER NOT NULL,status TEXT NOT NULL DEFAULT 'requested',payment_url TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL);
    ''')
    # migrations for older DBs
-   for col,typ,default in [('blocked','INTEGER NOT NULL DEFAULT 0','0'),('blocked_until','TEXT',None)]:
+   for col,typ,default in [('blocked','INTEGER NOT NULL DEFAULT 0','0'),('blocked_until','TEXT',None),('referred_by_tg','INTEGER',None)]:
     try:c.execute(f'ALTER TABLE users ADD COLUMN {col} {typ}')
     except sqlite3.OperationalError:pass
    for col,typ,default in [('note',"TEXT NOT NULL DEFAULT ''",None),('paid_by_id','INTEGER',None),('paid_by_username',"TEXT",None)]:
@@ -43,7 +45,7 @@ class Database:
     except sqlite3.OperationalError:pass
    try:c.execute("ALTER TABLE json_service_orders ADD COLUMN source TEXT NOT NULL DEFAULT 'Ko‘rsatilmagan'")
    except sqlite3.OperationalError:pass
-   defaults={'min_withdrawal':'10000','help_text':'Yordam uchun admin bilan bog‘laning.','admin_username':'','membership_required':'0','official_channel_id':'','official_channel_link':'','payment_channel_id':'','json_service_price':'20000'}
+   defaults={'min_withdrawal':'10000','help_text':'Yordam uchun admin bilan bog‘laning.','admin_username':'','membership_required':'0','official_channel_id':'','official_channel_link':'','payment_channel_id':'','json_service_price':'20000','ref_reward_json_sale':'1000','ref_reward_json_service':'1500','ref_reward_kiro_link':'2000','kiro_link_price':'0'}
    for k,v in defaults.items(): c.execute('INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)',(k,v))
    # Migrate the old single-channel mandatory subscription setting into the new multi-chat table.
    old_chat=c.execute("SELECT value FROM settings WHERE key='official_channel_id'").fetchone()
@@ -82,6 +84,54 @@ class Database:
       u=c.execute('SELECT * FROM users WHERE telegram_user_id=?',(tg,)).fetchone()
     except Exception: pass
    return u
+ def create_kiro_link_request(self, user_tg):
+  with self.conn() as c:
+   cur=c.execute("INSERT INTO kiro_link_requests(user_tg,status,created_at,updated_at) VALUES(?,'requested',?,?)",(int(user_tg),now(),now()))
+   return cur.lastrowid
+ def kiro_link_request(self, request_id):
+  with self.conn() as c:return c.execute('SELECT * FROM kiro_link_requests WHERE id=?',(int(request_id),)).fetchone()
+ def set_kiro_payment_url(self, request_id, url):
+  with self.conn() as c:
+   cur=c.execute("UPDATE kiro_link_requests SET payment_url=?,status='link_sent',updated_at=? WHERE id=? AND status='requested'",(url,now(),int(request_id)))
+   return cur.rowcount==1
+ def set_kiro_link_status(self, request_id, status):
+  with self.conn() as c:
+   cur=c.execute("UPDATE kiro_link_requests SET status=?,updated_at=? WHERE id=? AND status IN ('requested','link_sent','payment_reported')",(status,now(),int(request_id)))
+   return cur.rowcount==1
+ def kiro_link_history(self, user_tg):
+  with self.conn() as c:return c.execute('SELECT * FROM kiro_link_requests WHERE user_tg=? ORDER BY id DESC LIMIT 20',(int(user_tg),)).fetchall()
+ def attach_referral(self, invited_tg, inviter_tg):
+  if not inviter_tg or int(inviter_tg)==int(invited_tg): return False
+  with self.conn() as c:
+   inv=c.execute('SELECT telegram_user_id FROM users WHERE telegram_user_id=?',(int(inviter_tg),)).fetchone()
+   user=c.execute('SELECT referred_by_tg FROM users WHERE telegram_user_id=?',(int(invited_tg),)).fetchone()
+   if not inv or not user or user['referred_by_tg'] is not None:return False
+   c.execute('UPDATE users SET referred_by_tg=? WHERE telegram_user_id=?',(int(inviter_tg),int(invited_tg)))
+   return True
+ def referral_stats(self, tg):
+  with self.conn() as c:
+   invited=c.execute('SELECT COUNT(*) n FROM users WHERE referred_by_tg=?',(int(tg),)).fetchone()['n']
+   rewards=c.execute('SELECT COALESCE(SUM(amount),0) total,COUNT(*) n FROM referral_rewards WHERE inviter_tg=?',(int(tg),)).fetchone()
+   return {'invited':invited,'earned':rewards['total'],'rewards':rewards['n']}
+ def credit_referral_reward(self, invited_tg, operation_type, operation_id):
+  keys={'json_sale':'ref_reward_json_sale','json_service':'ref_reward_json_service','kiro_link':'ref_reward_kiro_link'}
+  key=keys.get(operation_type)
+  if not key:return None
+  try: amount=max(0,int(self.setting(key,'0')))
+  except ValueError: amount=0
+  if amount<=0:return None
+  with self.conn() as c:
+   invited=c.execute('SELECT referred_by_tg FROM users WHERE telegram_user_id=?',(int(invited_tg),)).fetchone()
+   if not invited or not invited['referred_by_tg'] or int(invited['referred_by_tg'])==int(invited_tg):return None
+   inviter=int(invited['referred_by_tg'])
+   try:c.execute('INSERT INTO referral_rewards(inviter_tg,invited_tg,operation_type,operation_id,amount,created_at) VALUES(?,?,?,?,?,?)',(inviter,int(invited_tg),operation_type,int(operation_id),amount,now()))
+   except sqlite3.IntegrityError:return None
+   u=c.execute('SELECT id,balance FROM users WHERE telegram_user_id=?',(inviter,)).fetchone()
+   if not u:return None
+   balance=u['balance']+amount
+   c.execute('UPDATE users SET balance=? WHERE id=?',(balance,u['id']))
+   c.execute('INSERT INTO transactions(user_id,type,amount,balance_after,reference,note,created_at) VALUES(?,?,?,?,?,?,?)',(u['id'],'referral_reward',amount,balance,f'REF#{operation_type}:{operation_id}',f'Referal mukofoti: {operation_type}',now()))
+   return {'inviter_tg':inviter,'invited_tg':int(invited_tg),'amount':amount,'balance':balance,'operation_type':operation_type}
  def setting(self,k,d=''):
   with self.conn() as c:
    r=c.execute('SELECT value FROM settings WHERE key=?',(k,)).fetchone();return r['value'] if r else d

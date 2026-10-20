@@ -17,6 +17,8 @@ import handler_admin as admin
 import handler_cards as cards
 import handler_json_service_order as json_service_order
 import handler_topups as topups
+import handler_referrals as referrals
+import handler_link as link_service
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
@@ -40,7 +42,7 @@ async def main():
             fsm = data.get('state')
             if fsm is not None:
                 await fsm.clear()
-        if isinstance(event, Message) and event.text in ('📝 JSON tayyorlash', '🛒 JSON sotish', '💰 Balansim', '➕ Balans to‘ldirish', '💸 Pul chiqarish', '📦 Sotuvlarim', '📜 Tarix', '👤 Kabinet', '💳 Kartalarim', '❓ Yordam'):
+        if isinstance(event, Message) and event.text in ('📝 JSON tayyorlash', '🛒 JSON sotish', '💰 Balansim', '➕ Balans to‘ldirish', '💸 Pul chiqarish', '📦 Sotuvlarim', '📜 Tarix', '👤 Kabinet', '💳 Kartalarim', '🎁 Referal', '🔗 Link', '❓ Yordam'):
             from aiogram.fsm.context import FSMContext
             from aiogram.fsm.storage.base import StorageKey
             key = StorageKey(bot_id=bot.id, chat_id=event.chat.id, user_id=event.from_user.id)
@@ -117,6 +119,8 @@ async def main():
     dp.include_router(user.router)
     dp.include_router(json_service_order.router)
     dp.include_router(topups.router)
+    dp.include_router(referrals.router)
+    dp.include_router(link_service.router)
     dp.include_router(json_market.router)
     dp.include_router(cards.router)
     dp.include_router(withdrawals.router)
